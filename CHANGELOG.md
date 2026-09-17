@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/bcit-tlu/redirect-service/compare/v0.3.1...v0.4.0) (2026-09-17)
+
+
+### Features
+
+* move delay_seconds into mappings.env as a directive line ([bfa8d6e](https://github.com/bcit-tlu/redirect-service/commit/bfa8d6e5d7811c6e96c3747b4c0bbd86141ec894))
+
 ## [0.3.1](https://github.com/bcit-tlu/redirect-service/compare/v0.3.0...v0.3.1) (2026-09-17)
 
 
