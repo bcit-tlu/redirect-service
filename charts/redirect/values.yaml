@@ -3,7 +3,7 @@ image:
   tag: '' # Defaults to .Chart.AppVersion
   pullPolicy: IfNotPresent
 
-replicaCount: 2
+replicaCount: 1
 
 # Source host -> target base URL. Each entry lets the splash page send
 # visitors of <source host> to <target>. Rendered into REDIRECT_MAPPINGS.
