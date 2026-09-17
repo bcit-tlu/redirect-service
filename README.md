@@ -49,20 +49,26 @@ The entrypoint picks **one** file, first match wins:
 4. `/etc/redirect-service/mappings.env` — baked into the image
    (empty by default)
 
+`REDIRECT_DELAY_SECONDS` (countdown length, default `5`) follows the
+same tier idea: an optional `REDIRECT_DELAY_SECONDS` key in the override
+or chart ConfigMap is read as a mounted file — first match wins — then
+the environment variable, then `5`. (Mounted files update live; env vars
+are frozen at container start, so the file tiers take precedence.)
+
 | Environment variable     | Default | Description                                              |
 | ------------------------ | ------- | -------------------------------------------------------- |
 | `MAPPINGS_FILE`          | —       | Explicit mapping-file path; skips the precedence search. |
-| `REDIRECT_DELAY_SECONDS` | `5`     | Countdown length before the redirect fires.              |
+| `REDIRECT_DELAY_SECONDS` | `5`     | Countdown fallback when no delay file exists.            |
 
 A missing/unreadable table at **startup** makes the container exit
 non-zero (fail fast instead of silently serving no redirects).
 
-**Live updates:** a watcher polls the effective mapping file every 5s
-and re-renders the served `/config.json`, so editing a mounted
+**Live updates:** a watcher polls the effective mapping and delay files
+every 5s and re-renders the served `/config.json`, so editing a mounted
 ConfigMap (e.g. via `kubectl edit cm` or the Rancher UI) takes effect
 within ~a minute (kubelet ConfigMap sync + poll interval) — no pod
 restart needed, including when the override ConfigMap is *created*
-after the pod started. A failed re-render keeps the last good table.
+after the pod started. A failed re-render keeps the last good config.
 Note that in a GitOps-managed deployment the controller will revert
 out-of-band ConfigMap edits on its next reconcile — durable changes
 belong in Git.

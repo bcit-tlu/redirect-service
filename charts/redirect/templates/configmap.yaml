@@ -5,9 +5,9 @@ metadata:
   labels:
     {{- include "redirect.labels" . | nindent 4 }}
 data:
-  # Mounted at /etc/redirect-service/chart/mappings.env — the default
-  # table tier between any override ConfigMap and the image's baked-in
-  # file. Same KEY=VALUE format as the repo's mappings.env.
+  # Mounted at /etc/redirect-service/chart/ — the default tier between
+  # any override ConfigMap and the image's baked-in file. Both keys are
+  # read as mounted files so edits apply live (no pod restart).
   {{- if .Values.mappings }}
   mappings.env: |
     {{- range $host, $target := .Values.mappings }}

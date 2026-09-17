@@ -1,13 +1,16 @@
 #!/bin/sh
-# Render /config.json's body from a KEY=VALUE mapping file, then start
-# Caddy. A background poll re-renders when the effective mapping file
-# changes — mounted ConfigMap volumes update in place, so cluster-side
+# Render /config.json's body from KEY=VALUE mapping + delay files, then
+# start Caddy. A background poll re-renders when the effective files
+# change — mounted ConfigMap volumes update in place, so cluster-side
 # edits take effect without a pod restart. Fails fast at startup when no
 # table can be read; later render failures keep the last good config.
 set -eu
 
 RUN_DIR=/tmp/redirect-run
 CONFIG_OUT="$RUN_DIR/config.json"
+OVERRIDE_DIR=/etc/redirect-service/override
+CHART_DIR=/etc/redirect-service/chart
+BAKED_FILE=/etc/redirect-service/mappings.env
 
 # Mapping table precedence, first match wins: explicit MAPPINGS_FILE >
 # deployer override ConfigMap > chart ConfigMap > table baked into the
@@ -18,14 +21,29 @@ mappings_file() {
 		[ -f "$MAPPINGS_FILE" ] && printf '%s' "$MAPPINGS_FILE"
 		return
 	fi
-	for f in /etc/redirect-service/override/mappings.env \
-		/etc/redirect-service/chart/mappings.env \
-		/etc/redirect-service/mappings.env; do
+	for f in "$OVERRIDE_DIR/mappings.env" \
+		"$CHART_DIR/mappings.env" \
+		"$BAKED_FILE"; do
 		if [ -f "$f" ]; then
 			printf '%s' "$f"
 			return
 		fi
 	done
+}
+
+# Delay precedence mirrors the mapping tiers: an optional
+# REDIRECT_DELAY_SECONDS key in the override or chart ConfigMap (mounted
+# as a same-named file) > the env var > 5. Mounted files update live,
+# unlike env vars, which are frozen at container start.
+delay_seconds() {
+	for f in "$OVERRIDE_DIR/REDIRECT_DELAY_SECONDS" \
+		"$CHART_DIR/REDIRECT_DELAY_SECONDS"; do
+		if [ -f "$f" ]; then
+			cat "$f"
+			return
+		fi
+	done
+	printf '%s' "${REDIRECT_DELAY_SECONDS:-5}"
 }
 
 # host=target per line; '#' comments and blank lines ignored; split on
@@ -45,32 +63,42 @@ render() {
 	tmp="$RUN_DIR/.config.json.$$"
 	jq -nc \
 		--argjson map "$map" \
-		--argjson delay "${REDIRECT_DELAY_SECONDS:-5}" \
+		--argjson delay "$(delay_seconds)" \
 		'{delaySeconds: $delay, mappings: ($map | with_entries(.key |= ascii_downcase))}' \
 		> "$tmp" || return 1
 	mv "$tmp" "$CONFIG_OUT"
 }
 
+# Content hash of every file that feeds the render — a change to the
+# effective mapping file OR either delay file triggers a re-render.
+sig() {
+	f=$(mappings_file || true)
+	{
+		[ -n "$f" ] && cksum "$f"
+		for d in "$OVERRIDE_DIR/REDIRECT_DELAY_SECONDS" \
+			"$CHART_DIR/REDIRECT_DELAY_SECONDS"; do
+			[ -f "$d" ] && cksum "$d"
+		done
+	} 2>/dev/null | cksum
+}
+
 mkdir -p "$RUN_DIR"
 render
+sig_cur=$(sig)
 
-sig="$(mappings_file):$(cksum "$(mappings_file)" | cut -d' ' -f1-2)"
-
-# Poll for mapping-table changes (added/removed/updated files or
-# precedence shifts). Content hash, not mtime — ConfigMap mounts swap
-# symlinks and may preserve timestamps.
+# Poll for config changes (added/removed/updated files or precedence
+# shifts). Content hash, not mtime — ConfigMap mounts swap symlinks and
+# may preserve timestamps.
 (
 	while :; do
 		sleep 5
-		f=$(mappings_file || true)
-		[ -n "$f" ] || continue
-		s="$f:$(cksum "$f" 2>/dev/null | cut -d' ' -f1-2 || true)"
-		if [ "$s" != "$sig" ]; then
+		s=$(sig)
+		if [ "$s" != "$sig_cur" ]; then
 			if render; then
-				sig="$s"
-				echo "redirect: reloaded mappings from $f" >&2
+				sig_cur="$s"
+				echo "redirect: reloaded config" >&2
 			else
-				echo "redirect: mappings render failed; keeping last config" >&2
+				echo "redirect: config render failed; keeping last config" >&2
 			fi
 		fi
 	done
