@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/bcit-tlu/redirect-service/compare/v0.3.0...v0.3.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **chart:** serve REDIRECT_DELAY_SECONDS as a mounted file, not env ([27d2620](https://github.com/bcit-tlu/redirect-service/commit/27d26201c22518e22d6f7c4a8bf0e9182d8c6e71))
+
 ## [0.3.0](https://github.com/bcit-tlu/redirect-service/compare/v0.2.0...v0.3.0) (2026-09-17)
 
 
