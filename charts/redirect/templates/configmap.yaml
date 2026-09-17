@@ -5,13 +5,12 @@ metadata:
   labels:
     {{- include "redirect.labels" . | nindent 4 }}
 data:
-  # Mounted at /etc/redirect-service/chart/ — the default tier between
-  # any override ConfigMap and the image's baked-in file. Both keys are
-  # read as mounted files so edits apply live (no pod restart).
-  {{- if .Values.mappings }}
+  # Mounted at /etc/redirect-service/chart/mappings.env — the default
+  # tier between any override ConfigMap and the image's baked-in file.
+  # delay_seconds is a reserved directive line; everything else is a
+  # host=target mapping. Edits apply live (no pod restart).
   mappings.env: |
+    delay_seconds={{ .Values.delaySeconds }}
     {{- range $host, $target := .Values.mappings }}
     {{ $host }}={{ $target }}
     {{- end }}
-  {{- end }}
-  REDIRECT_DELAY_SECONDS: {{ .Values.delaySeconds | quote }}

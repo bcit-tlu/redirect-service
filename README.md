@@ -32,9 +32,11 @@ parameter, so the service cannot be abused as an open redirect.
 
 The mapping table is a `KEY=VALUE` env file — one `host=target` per
 line, `#` comments and blank lines ignored, split on the first `=` so
-targets keep query strings intact:
+targets keep query strings intact. `delay_seconds` is a reserved
+directive key (countdown length), not a host mapping:
 
 ```
+delay_seconds=5
 oldapp.example.com=https://newapp.example.com
 ```
 
@@ -45,27 +47,21 @@ The entrypoint picks **one** file, first match wins:
    ConfigMap (e.g. Flux `configMapGenerator`), mounted by the chart
    from the ConfigMap named by `mappingsConfigMap`
 3. `/etc/redirect-service/chart/mappings.env` — the chart's own
-   ConfigMap, rendered from the `mappings` value
+   ConfigMap, rendered from the `mappings` + `delaySeconds` values
 4. `/etc/redirect-service/mappings.env` — baked into the image
    (empty by default)
-
-`REDIRECT_DELAY_SECONDS` (countdown length, default `5`) follows the
-same tier idea: an optional `REDIRECT_DELAY_SECONDS` key in the override
-or chart ConfigMap is read as a mounted file — first match wins — then
-the environment variable, then `5`. (Mounted files update live; env vars
-are frozen at container start, so the file tiers take precedence.)
 
 | Environment variable     | Default | Description                                              |
 | ------------------------ | ------- | -------------------------------------------------------- |
 | `MAPPINGS_FILE`          | —       | Explicit mapping-file path; skips the precedence search. |
-| `REDIRECT_DELAY_SECONDS` | `5`     | Countdown fallback when no delay file exists.            |
+| `REDIRECT_DELAY_SECONDS` | `5`     | Countdown fallback when the file has no `delay_seconds`.   |
 
 A missing/unreadable table at **startup** makes the container exit
 non-zero (fail fast instead of silently serving no redirects).
 
-**Live updates:** a watcher polls the effective mapping and delay files
-every 5s and re-renders the served `/config.json`, so editing a mounted
-ConfigMap (e.g. via `kubectl edit cm` or the Rancher UI) takes effect
+**Live updates:** a watcher polls the effective file every 5s and
+re-renders the served `/config.json`, so editing a mounted ConfigMap
+(e.g. via `kubectl edit cm` or the Rancher UI) takes effect
 within ~a minute (kubelet ConfigMap sync + poll interval) — no pod
 restart needed, including when the override ConfigMap is *created*
 after the pod started. A failed re-render keeps the last good config.
