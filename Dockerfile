@@ -6,7 +6,7 @@
 # uniform `target: stable` matrix entry across components.
 FROM caddy:2-alpine AS stable
 
-# jq validates and normalizes REDIRECT_MAPPINGS at container start.
+# jq parses and normalizes the mappings.env table at container start.
 RUN apk add --no-cache jq
 
 # The base image grants /usr/bin/caddy the cap_net_bind_service file

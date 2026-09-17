@@ -30,13 +30,36 @@ parameter, so the service cannot be abused as an open redirect.
 
 ## Configuration
 
-| Environment variable     | Default | Description                                                                                     |
-| ------------------------ | ------- | ----------------------------------------------------------------------------------------------- |
-| `REDIRECT_MAPPINGS`      | `{}`    | JSON object mapping source host → target base URL, e.g. `{"qcon.ltc.bcit.ca":"https://qcon-solo.ltc.bcit.ca"}` |
-| `REDIRECT_DELAY_SECONDS` | `5`     | Countdown length before the redirect fires.                                                     |
+The mapping table is a `KEY=VALUE` env file — one `host=target` per
+line, `#` comments and blank lines ignored, split on the first `=` so
+targets keep query strings intact:
 
-Malformed `REDIRECT_MAPPINGS` JSON makes the container exit non-zero at
-startup (fail fast instead of silently serving no redirects).
+```
+qcon.ltc.bcit.ca=https://qcon-solo.ltc.bcit.ca
+```
+
+The entrypoint picks **one** file, first match wins:
+
+1. `$MAPPINGS_FILE`, when set
+2. `/etc/redirect-service/override/mappings.env` — deployer-provided
+   ConfigMap (e.g. Flux `configMapGenerator`), mounted by the chart
+   from the ConfigMap named by `mappingsConfigMap`
+3. `/etc/redirect-service/chart/mappings.env` — the chart's own
+   ConfigMap, rendered from the `mappings` value
+4. `/etc/redirect-service/mappings.env` — baked into the image
+   (`redirect-bcit.ltc.bcit.ca → https://bcit.ca`)
+
+| Environment variable     | Default | Description                                              |
+| ------------------------ | ------- | -------------------------------------------------------- |
+| `MAPPINGS_FILE`          | —       | Explicit mapping-file path; skips the precedence search. |
+| `REDIRECT_DELAY_SECONDS` | `5`     | Countdown length before the redirect fires.              |
+
+A missing/unreadable table makes the container exit non-zero at
+startup (fail fast instead of silently serving no redirects). Mapping
+files are read once at startup — a ConfigMap content change alone does
+not apply until the pods restart (the chart's `checksum/config`
+annotation handles this for its own ConfigMap; restart the deployment
+after changing an override ConfigMap).
 
 ## Telemetry
 
@@ -74,13 +97,15 @@ curl -s 'localhost:8080/?from=qcon.ltc.bcit.ca'
 open 'http://localhost:8080/?from=qcon.ltc.bcit.ca'   # watch the countdown
 ```
 
-Or without compose:
+Or without compose — the image's baked-in table serves by default; mount
+a file to override:
 
 ```bash
 docker build -t redirect-service .
+docker run --rm -p 8080:8080 redirect-service                      # defaults
 docker run --rm -p 8080:8080 \
-  -e REDIRECT_MAPPINGS='{"qcon.ltc.bcit.ca":"https://qcon-solo.ltc.bcit.ca"}' \
-  redirect-service
+  -v "$PWD/mappings.env:/etc/redirect-service/override/mappings.env:ro" \
+  redirect-service                                                 # override
 ```
 
 ## Deployment

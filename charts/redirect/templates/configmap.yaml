@@ -5,9 +5,13 @@ metadata:
   labels:
     {{- include "redirect.labels" . | nindent 4 }}
 data:
-  # When empty, the key is omitted so the container falls back to the
-  # mappings.env table baked into the image.
+  # Mounted at /etc/redirect-service/chart/mappings.env — the default
+  # table tier between any override ConfigMap and the image's baked-in
+  # file. Same KEY=VALUE format as the repo's mappings.env.
   {{- if .Values.mappings }}
-  REDIRECT_MAPPINGS: {{ .Values.mappings | toJson | quote }}
+  mappings.env: |
+    {{- range $host, $target := .Values.mappings }}
+    {{ $host }}={{ $target }}
+    {{- end }}
   {{- end }}
   REDIRECT_DELAY_SECONDS: {{ .Values.delaySeconds | quote }}

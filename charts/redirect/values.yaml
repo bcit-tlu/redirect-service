@@ -3,14 +3,22 @@ image:
   tag: '' # Defaults to .Chart.AppVersion
   pullPolicy: IfNotPresent
 
-replicaCount: 1
+replicaCount: 2
 
-# Source host -> target base URL. Each entry lets the splash page send
-# visitors of <source host> to <target>. Rendered into REDIRECT_MAPPINGS.
-# Example:
+# Source host -> target base URL, rendered as a mappings.env file into
+# the chart's default ConfigMap (mounted at /etc/redirect-service/chart).
+# A deployer-provided ConfigMap (named by mappingsConfigMap) takes
+# precedence when present; the image's baked-in table is the last
+# fallback. Example:
 # mappings:
 #   qcon.ltc.bcit.ca: https://qcon-solo.ltc.bcit.ca
-mappings: {}
+mappings:
+  redirect-bcit.ltc.bcit.ca: https://bcit.ca
+
+# Name of the deployer-provided ConfigMap whose mappings.env key
+# overrides the chart's default table (e.g. Flux configMapGenerator).
+# Referenced by an optional volume — absence is not an error.
+mappingsConfigMap: redirect-mappings
 
 # Countdown length (seconds) before the browser is redirected.
 delaySeconds: 5

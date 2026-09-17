@@ -1,21 +1,30 @@
 #!/bin/sh
-# Validate REDIRECT_MAPPINGS and render CONFIG_JSON for the Caddyfile's
-# /config.json endpoint before starting Caddy. Fails fast on malformed
-# JSON so a bad deploy CrashLoops instead of silently serving no redirects.
+# Render CONFIG_JSON for the Caddyfile's /config.json endpoint before
+# starting Caddy. The mapping table comes solely from a KEY=VALUE env file.
+# Fails fast when no table can be read.
 set -eu
 
-# Default mapping table baked into the image (KEY=VALUE per line). An
-# explicit REDIRECT_MAPPINGS env var (deployment ConfigMap) overrides it.
-MAPPINGS_FILE="${MAPPINGS_FILE:-/etc/redirect-service/mappings.env}"
-if [ -z "${REDIRECT_MAPPINGS:-}" ] && [ -f "$MAPPINGS_FILE" ]; then
-	REDIRECT_MAPPINGS=$(jq -Rn \
-		'reduce (inputs | select(test("\\S")) | select(startswith("#") | not)) as $l
-			({}; . + ($l | split("=") | {(.[0]): (.[1:] | join("="))}))' \
-		"$MAPPINGS_FILE")
-	export REDIRECT_MAPPINGS
+# Mapping table precedence: explicit MAPPINGS_FILE > deployer override
+# ConfigMap > chart ConfigMap > table baked into the image.
+MAPPINGS_FILE="${MAPPINGS_FILE:-}"
+if [ -z "$MAPPINGS_FILE" ]; then
+	for f in /etc/redirect-service/override/mappings.env \
+		/etc/redirect-service/chart/mappings.env \
+		/etc/redirect-service/mappings.env; do
+		if [ -f "$f" ]; then
+			MAPPINGS_FILE="$f"
+			break
+		fi
+	done
 fi
 
-: "${REDIRECT_MAPPINGS:={}}"
+# host=target per line; '#' comments and blank lines ignored; split on
+# the first '=' so target URLs keep query strings intact.
+REDIRECT_MAPPINGS=$(jq -Rn \
+	'reduce (inputs | select(test("\\S")) | select(startswith("#") | not)) as $l
+		({}; . + ($l | split("=") | {(.[0]): (.[1:] | join("="))}))' \
+	"$MAPPINGS_FILE")
+export REDIRECT_MAPPINGS
 
 echo "$REDIRECT_MAPPINGS" | jq -e 'type == "object"' >/dev/null
 

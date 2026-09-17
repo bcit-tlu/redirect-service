@@ -2,8 +2,8 @@
 
 This service expects the edge proxy (HAProxy, `haproxy-configs` repo) to
 302 migrating hosts to `https://redirect.ltc.bcit.ca/?from=<host>`. The
-`splash` page looks `<host>` up in its `REDIRECT_MAPPINGS` table and sends
-the browser to the mapped target after the countdown.
+`splash` page looks `<host>` up in its mapping table (`mappings.env`)
+and sends the browser to the mapped target after the countdown.
 
 ## Prerequisites
 
@@ -55,8 +55,8 @@ Per service being migrated, add one ACL + one redirect line:
     http-request redirect location https://redirect.ltc.bcit.ca/?from=%[req.hdr(host)] code 302 if host_oldapp
 ```
 
-…and a matching entry in the deployment's `REDIRECT_MAPPINGS` (Helm value
-`mappings`).
+…and a matching `host=target` line in the deployment's `mappings.env`
+(Helm value `mappings`, or an override ConfigMap — see the README).
 
 ## Rollback / cutover completion
 

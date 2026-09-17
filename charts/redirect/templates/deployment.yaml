@@ -39,14 +39,6 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
-            - name: REDIRECT_MAPPINGS
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "redirect.fullname" . }}
-                  key: REDIRECT_MAPPINGS
-                  # Absent when values.mappings is empty — the entrypoint
-                  # then uses the mappings.env defaults baked into the image.
-                  optional: true
             - name: REDIRECT_DELAY_SECONDS
               valueFrom:
                 configMapKeyRef:
@@ -80,10 +72,27 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            # Mapping table tiers (see entrypoint precedence):
+            #   override CM (deployer/Flux) > chart CM > baked-in file.
+            - name: mappings-default
+              mountPath: /etc/redirect-service/chart
+              readOnly: true
+            - name: mappings-override
+              mountPath: /etc/redirect-service/override
+              readOnly: true
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.tmp.sizeLimit }}
+        - name: mappings-default
+          configMap:
+            name: {{ include "redirect.fullname" . }}
+        - name: mappings-override
+          configMap:
+            name: {{ .Values.mappingsConfigMap }}
+            # Supplied by the deployer (e.g. Flux configMapGenerator);
+            # absence falls back to the chart ConfigMap / image defaults.
+            optional: true
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

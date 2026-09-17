@@ -4,6 +4,8 @@ services:
     ports:
       - 8080:8080
     environment:
-      # Sample mapping for local testing — replace with real host pairs.
-      - REDIRECT_MAPPINGS={"qcon.ltc.bcit.ca":"https://qcon-solo.ltc.bcit.ca"}
       - REDIRECT_DELAY_SECONDS=5
+    volumes:
+      # Mounted at the override path — this file beats the chart/baked-in
+      # tables. Edit mappings.env and restart to test other pairs.
+      - ./mappings.env:/etc/redirect-service/override/mappings.env:ro
