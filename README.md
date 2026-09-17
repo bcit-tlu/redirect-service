@@ -2,8 +2,7 @@
 
 A minimal Caddy service that shows visitors a "this site is being migrated"
 splash page and redirects them to the workload's new home after a short
-countdown. Built for the `qcon.ltc.bcit.ca` → `qcon-solo.ltc.bcit.ca`
-migration, but generic — any number of source hosts can be mapped.
+countdown. Built for migrations — any number of source hosts can be mapped.
 
 ## How it works
 
