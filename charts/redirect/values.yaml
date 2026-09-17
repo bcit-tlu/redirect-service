@@ -19,6 +19,15 @@ service:
   type: ClusterIP
   port: 80
 
+# The edge proxy routes the splash hostname to the cluster ingress, which
+# forwards to this Service. Disabled by default for bare-cluster installs.
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts: []
+  tls: []
+
 metrics:
   # Renders a PodMonitor so Prometheus-operator clusters scrape /metrics.
   # Redirect volume per source host is also available in the JSON access

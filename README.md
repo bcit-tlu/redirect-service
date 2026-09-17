@@ -87,7 +87,7 @@ docker run --rm -p 8080:8080 \
 ## Deployment
 
 The `charts/redirect` Helm chart renders a Deployment + Service (+ optional
-NetworkPolicy and PodMonitor):
+Ingress, NetworkPolicy, and PodMonitor):
 
 ```bash
 helm install redirect charts/redirect \
