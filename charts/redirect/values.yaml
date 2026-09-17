@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/bcit-tlu/redirect-service
+  repository: ghcr.io/bcit-tlu/redirect-service/redirect-service
   tag: '' # Defaults to .Chart.AppVersion
   pullPolicy: IfNotPresent
 
