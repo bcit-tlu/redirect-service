@@ -1,0 +1,90 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# Default to least privilege; jobs elevate only when needed.
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      releases_created: ${{ steps.rp.outputs.releases_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      # A GitHub App token is required so that the PR push triggers
+      # downstream workflows (ci.yaml, pr-title-lint).  GITHUB_TOKEN's
+      # anti-recursion guard silently prevents other workflows from
+      # running on the PR, leaving branch-protection checks unsatisfied.
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      # `release-as` is one-shot. Once manifest catches up, remove it;
+      # otherwise future semver bumps are pinned and releases stall.
+      - uses: actions/checkout@v6
+        if: steps.rp.outputs.releases_created != 'true'
+      - name: Guard against stale `release-as` entries
+        if: steps.rp.outputs.releases_created != 'true'
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          with open("release-please-config.json") as f:
+              cfg = json.load(f)
+          with open(".release-please-manifest.json") as f:
+              manifest = json.load(f)
+          stale = []
+          for pkg, conf in cfg.get("packages", {}).items():
+              ra = conf.get("release-as")
+              if ra is not None and manifest.get(pkg) == ra:
+                  stale.append((pkg, ra))
+          if stale:
+              print("::error::Stale `release-as` entries in release-please-config.json:")
+              for pkg, ra in stale:
+                  print(f"::error::  packages.{pkg}.release-as={ra} already matches .release-please-manifest.json — remove this field so release-please can resume normal semver bumps.")
+              sys.exit(1)
+          PY
+
+  # Dispatch helm-publish and release-retag for the released tag.
+  dispatch-publish:
+    needs: release
+    if: needs.release.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch downstream workflows for the released tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${TAG}" ]]; then
+            echo "::error::release-please reported a release but emitted no tag_name"
+            exit 1
+          fi
+          echo "Dispatching helm-publish.yaml for ${TAG}"
+          gh workflow run helm-publish.yaml \
+            --ref "${TAG}" \
+            -f tag_name="${TAG}"
+          echo "Dispatching release-retag.yaml for ${TAG}"
+          gh workflow run release-retag.yaml \
+            --ref "${TAG}" \
+            -f tag_name="${TAG}"

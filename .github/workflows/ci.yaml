@@ -59,6 +59,7 @@ jobs:
       image_name: redirect-service
       context: .
       target: stable
+      tag_prefix: 'v'
     secrets: inherit
 
   helm-publish:
@@ -80,6 +81,19 @@ jobs:
 
       - uses: azure/setup-helm@v5
 
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Cosign login (OCI)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY: ${{ env.REGISTRY }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          echo "${GITHUB_TOKEN}" | \
+            cosign login "${REGISTRY}" \
+            -u "${ACTOR}" \
+            --password-stdin
+
       - name: Helm login (OCI)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -92,6 +106,7 @@ jobs:
             --password-stdin
 
       - name: Package and push chart
+        id: push
         shell: bash
         env:
           VERSION: ${{ needs.build-redirect.outputs.rc_version }}
@@ -107,4 +122,25 @@ jobs:
             --app-version "${VERSION}" \
             -d /tmp/charts
 
-          helm push "/tmp/charts/${CHART_NAME}-${VERSION}.tgz" "${OCI_BASE}"
+          PUSH_OUT=$(helm push \
+            "/tmp/charts/${CHART_NAME}-${VERSION}.tgz" \
+            "${OCI_BASE}" 2>&1) || { echo "${PUSH_OUT}"; exit 1; }
+          echo "${PUSH_OUT}"
+
+          # Tolerant digest parse: case-insensitive, allows leading whitespace.
+          DIGEST=$(printf '%s\n' "${PUSH_OUT}" \
+            | awk 'tolower($1)=="digest:"{print $2; exit}')
+          if [[ -z "${DIGEST}" ]]; then
+            echo "::error::helm push succeeded but no digest found in output"
+            exit 1
+          fi
+
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "chart_name=${CHART_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign chart
+        env:
+          CHART_REF: ${{ env.REGISTRY }}/${{ github.repository }}/charts/${{ steps.push.outputs.chart_name }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes "${CHART_REF}@${DIGEST}"
