@@ -4,6 +4,17 @@
 # JSON so a bad deploy CrashLoops instead of silently serving no redirects.
 set -eu
 
+# Default mapping table baked into the image (KEY=VALUE per line). An
+# explicit REDIRECT_MAPPINGS env var (deployment ConfigMap) overrides it.
+MAPPINGS_FILE="${MAPPINGS_FILE:-/etc/redirect-service/mappings.env}"
+if [ -z "${REDIRECT_MAPPINGS:-}" ] && [ -f "$MAPPINGS_FILE" ]; then
+	REDIRECT_MAPPINGS=$(jq -Rn \
+		'reduce (inputs | select(test("\\S")) | select(startswith("#") | not)) as $l
+			({}; . + ($l | split("=") | {(.[0]): (.[1:] | join("="))}))' \
+		"$MAPPINGS_FILE")
+	export REDIRECT_MAPPINGS
+fi
+
 : "${REDIRECT_MAPPINGS:={}}"
 
 echo "$REDIRECT_MAPPINGS" | jq -e 'type == "object"' >/dev/null

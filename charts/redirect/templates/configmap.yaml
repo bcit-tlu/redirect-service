@@ -5,5 +5,9 @@ metadata:
   labels:
     {{- include "redirect.labels" . | nindent 4 }}
 data:
+  # When empty, the key is omitted so the container falls back to the
+  # mappings.env table baked into the image.
+  {{- if .Values.mappings }}
   REDIRECT_MAPPINGS: {{ .Values.mappings | toJson | quote }}
+  {{- end }}
   REDIRECT_DELAY_SECONDS: {{ .Values.delaySeconds | quote }}

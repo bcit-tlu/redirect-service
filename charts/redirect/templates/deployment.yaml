@@ -44,6 +44,9 @@ spec:
                 configMapKeyRef:
                   name: {{ include "redirect.fullname" . }}
                   key: REDIRECT_MAPPINGS
+                  # Absent when values.mappings is empty — the entrypoint
+                  # then uses the mappings.env defaults baked into the image.
+                  optional: true
             - name: REDIRECT_DELAY_SECONDS
               valueFrom:
                 configMapKeyRef:

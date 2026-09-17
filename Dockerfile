@@ -17,6 +17,7 @@ RUN setcap -r /usr/bin/caddy
 
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY mappings.env /etc/redirect-service/mappings.env
 COPY site/ /srv/
 
 RUN chmod +x /docker-entrypoint.sh
