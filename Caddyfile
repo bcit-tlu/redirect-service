@@ -1,8 +1,9 @@
 # Redirect splash service.
 #
 # Serves a static "site is being migrated" page plus a JSON config endpoint
-# whose body is rendered from the CONFIG_JSON environment variable at
-# Caddyfile-parse time (see docker-entrypoint.sh).
+# whose body is rendered to /tmp/redirect-run/config.json by
+# docker-entrypoint.sh and served from disk — mounted-ConfigMap edits take
+# effect without a config reload or pod restart.
 
 {
 	# Plain HTTP only — TLS terminates at the edge proxy (HAProxy).
@@ -35,12 +36,11 @@
 	}
 
 	# {"delaySeconds":N,"mappings":{"<source-host>":"<target-url>",...}}
-	# No default: docker-entrypoint.sh always exports CONFIG_JSON, and a
-	# missing value fails `caddy adapt` loudly rather than serving junk.
-	# (A `{$VAR:default}` default cannot contain `}` anyway — the parser
-	# terminates the placeholder at the first one.)
+	# Rendered by the entrypoint's watcher; file_server reads it fresh per
+	# request so mapping edits propagate as soon as the file updates.
 	handle /config.json {
-		respond {$CONFIG_JSON}
+		root * /tmp/redirect-run
+		file_server
 	}
 
 	# Redirect follow-through beacon. The splash page calls this with

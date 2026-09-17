@@ -7,17 +7,17 @@ countdown. Built for migrations — any number of source hosts can be mapped.
 ## How it works
 
 ```
-browser ──► https://qcon.ltc.bcit.ca
-              │  HAProxy: http-request redirect
+browser ──► https://oldapp.example.com
+              │  edge proxy: http-request redirect
               ▼
-           https://redirect.ltc.bcit.ca/?from=qcon.ltc.bcit.ca
+           https://redirect.example.com/?from=oldapp.example.com
               │  Caddy serves splash page
               ▼  (~5 s countdown)
-           https://qcon-solo.ltc.bcit.ca
+           https://newapp.example.com
 ```
 
-1. HAProxy issues a `302` for the migrating host, appending
-   `?from=<original host>` (see [`docs/haproxy.md`](docs/haproxy.md)).
+1. The edge proxy (e.g. HAProxy) issues a `302` for the migrating host,
+   appending `?from=<original host>` (see [`docs/haproxy.md`](docs/haproxy.md)).
 2. The splash page fetches `/config.json` and looks the `from` host up in
    the mapping table.
 3. A countdown runs, a `/e/redirect` beacon is recorded, and the browser
@@ -35,7 +35,7 @@ line, `#` comments and blank lines ignored, split on the first `=` so
 targets keep query strings intact:
 
 ```
-qcon.ltc.bcit.ca=https://qcon-solo.ltc.bcit.ca
+oldapp.example.com=https://newapp.example.com
 ```
 
 The entrypoint picks **one** file, first match wins:
@@ -47,19 +47,25 @@ The entrypoint picks **one** file, first match wins:
 3. `/etc/redirect-service/chart/mappings.env` — the chart's own
    ConfigMap, rendered from the `mappings` value
 4. `/etc/redirect-service/mappings.env` — baked into the image
-   (`redirect-bcit.ltc.bcit.ca → https://bcit.ca`)
+   (empty by default)
 
 | Environment variable     | Default | Description                                              |
 | ------------------------ | ------- | -------------------------------------------------------- |
 | `MAPPINGS_FILE`          | —       | Explicit mapping-file path; skips the precedence search. |
 | `REDIRECT_DELAY_SECONDS` | `5`     | Countdown length before the redirect fires.              |
 
-A missing/unreadable table makes the container exit non-zero at
-startup (fail fast instead of silently serving no redirects). Mapping
-files are read once at startup — a ConfigMap content change alone does
-not apply until the pods restart (the chart's `checksum/config`
-annotation handles this for its own ConfigMap; restart the deployment
-after changing an override ConfigMap).
+A missing/unreadable table at **startup** makes the container exit
+non-zero (fail fast instead of silently serving no redirects).
+
+**Live updates:** a watcher polls the effective mapping file every 5s
+and re-renders the served `/config.json`, so editing a mounted
+ConfigMap (e.g. via `kubectl edit cm` or the Rancher UI) takes effect
+within ~a minute (kubelet ConfigMap sync + poll interval) — no pod
+restart needed, including when the override ConfigMap is *created*
+after the pod started. A failed re-render keeps the last good table.
+Note that in a GitOps-managed deployment the controller will revert
+out-of-band ConfigMap edits on its next reconcile — durable changes
+belong in Git.
 
 ## Telemetry
 
@@ -93,8 +99,8 @@ docker compose up --build
 # then:
 curl -s localhost:8080/healthz
 curl -s localhost:8080/config.json
-curl -s 'localhost:8080/?from=qcon.ltc.bcit.ca'
-open 'http://localhost:8080/?from=qcon.ltc.bcit.ca'   # watch the countdown
+curl -s 'localhost:8080/?from=oldapp.example.com'
+open 'http://localhost:8080/?from=oldapp.example.com'   # watch the countdown
 ```
 
 Or without compose — the image's baked-in table serves by default; mount
@@ -115,14 +121,12 @@ Ingress, NetworkPolicy, and PodMonitor):
 
 ```bash
 helm install redirect charts/redirect \
-  --set mappings.'qcon\.ltc\.bcit\.ca'=https://qcon-solo.ltc.bcit.ca \
+  --set mappings.'oldapp\.example\.com'=https://newapp.example.com \
   --set metrics.podMonitor.enabled=true
 ```
 
-Cluster rollout is managed by Flux — see the tracking issue in
-`bcit-tlu/flux-fleet`. The HAProxy side of the flow (edge ACL that 302s the
-migrating host to `redirect.ltc.bcit.ca`) is documented in
-[`docs/haproxy.md`](docs/haproxy.md).
+The HAProxy side of the flow (edge ACL that 302s the migrating host to
+the splash host) is documented in [`docs/haproxy.md`](docs/haproxy.md).
 
 ## License
 

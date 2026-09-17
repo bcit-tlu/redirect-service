@@ -6,14 +6,13 @@ image:
 replicaCount: 2
 
 # Source host -> target base URL, rendered as a mappings.env file into
-# the chart's default ConfigMap (mounted at /etc/redirect-service/chart).
+# the chart's ConfigMap (mounted at /etc/redirect-service/chart).
 # A deployer-provided ConfigMap (named by mappingsConfigMap) takes
-# precedence when present; the image's baked-in table is the last
-# fallback. Example:
+# precedence when present; the image's baked-in (empty) table is the
+# last fallback. Example:
 # mappings:
-#   qcon.ltc.bcit.ca: https://qcon-solo.ltc.bcit.ca
-mappings:
-  redirect-bcit.ltc.bcit.ca: https://bcit.ca
+#   oldapp.example.com: https://newapp.example.com
+mappings: {}
 
 # Name of the deployer-provided ConfigMap whose mappings.env key
 # overrides the chart's default table (e.g. Flux configMapGenerator).
