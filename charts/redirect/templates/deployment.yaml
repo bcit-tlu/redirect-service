@@ -19,8 +19,8 @@ spec:
       labels:
         {{- include "redirect.selectorLabels" . | nindent 8 }}
       annotations:
-        # Restart pods when the mapping table changes.
-        checksum/mappings: {{ .Values.mappings | toJson | sha256sum }}
+        # Restart pods when the ConfigMap (mappings/delay) changes.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- if .Values.metrics.podMonitor.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
@@ -40,9 +40,15 @@ spec:
               protocol: TCP
           env:
             - name: REDIRECT_MAPPINGS
-              value: {{ .Values.mappings | toJson | quote }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "redirect.fullname" . }}
+                  key: REDIRECT_MAPPINGS
             - name: REDIRECT_DELAY_SECONDS
-              value: {{ .Values.delaySeconds | quote }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "redirect.fullname" . }}
+                  key: REDIRECT_DELAY_SECONDS
             # Caddy persists state (instance UUID, locks) under these XDG
             # dirs; /tmp is a writable emptyDir so the root filesystem can
             # stay read-only.

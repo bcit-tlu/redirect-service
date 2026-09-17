@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "redirect.fullname" . }}
+  labels:
+    {{- include "redirect.labels" . | nindent 4 }}
+data:
+  REDIRECT_MAPPINGS: {{ .Values.mappings | toJson | quote }}
+  REDIRECT_DELAY_SECONDS: {{ .Values.delaySeconds | quote }}
