@@ -9,6 +9,12 @@ FROM caddy:2-alpine AS stable
 # jq validates and normalizes REDIRECT_MAPPINGS at container start.
 RUN apk add --no-cache jq
 
+# The base image grants /usr/bin/caddy the cap_net_bind_service file
+# capability for privileged ports. We bind unprivileged :8080 only, and
+# the deployment drops ALL capabilities — the kernel refuses execve of a
+# file-cap binary absent from the bounding set (EPERM), so strip it.
+RUN setcap -r /usr/bin/caddy
+
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 COPY site/ /srv/
