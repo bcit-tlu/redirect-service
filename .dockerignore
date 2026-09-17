@@ -1,0 +1,10 @@
+# VCS
+.git*
+.github
+
+# Everything not needed by the image
+charts/
+docs/
+docker-compose.yml
+README.md
+LICENSE

@@ -1,0 +1,9 @@
+services:
+  redirect:
+    build: .
+    ports:
+      - 8080:8080
+    environment:
+      # Sample mapping for local testing — replace with real host pairs.
+      - REDIRECT_MAPPINGS={"qcon.ltc.bcit.ca":"https://qcon-solo.ltc.bcit.ca"}
+      - REDIRECT_DELAY_SECONDS=5

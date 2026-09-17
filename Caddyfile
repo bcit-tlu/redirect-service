@@ -1,0 +1,70 @@
+# Redirect splash service.
+#
+# Serves a static "site is being migrated" page plus a JSON config endpoint
+# whose body is rendered from the CONFIG_JSON environment variable at
+# Caddyfile-parse time (see docker-entrypoint.sh).
+
+{
+	# Plain HTTP only — TLS terminates at the edge proxy (HAProxy).
+	auto_https off
+	admin off
+	# Enable metrics collection globally; the site exposes /metrics.
+	metrics
+}
+
+:8080 {
+	root * /srv
+	encode zstd gzip
+
+	# Structured JSON access logs to stdout for the cluster log pipeline.
+	# Every splash hit records request.uri (which carries ?from=<host>).
+	log {
+		output stdout
+		format json
+	}
+
+
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		# Splash page and map must never be cached during a migration —
+		# a cached config would keep redirecting after the map changes.
+		Cache-Control no-store
+	}
+
+	# {"delaySeconds":N,"mappings":{"<source-host>":"<target-url>",...}}
+	# No default: docker-entrypoint.sh always exports CONFIG_JSON, and a
+	# missing value fails `caddy adapt` loudly rather than serving junk.
+	# (A `{$VAR:default}` default cannot contain `}` anyway — the parser
+	# terminates the placeholder at the first one.)
+	handle /config.json {
+		respond {$CONFIG_JSON}
+	}
+
+	# Redirect follow-through beacon. The splash page calls this with
+	# ?from=<src>&to=<dst> right before navigating, so logs/metrics can
+	# distinguish "saw the splash" (GET /) from "followed through".
+	handle /e/redirect {
+		respond 204
+	}
+
+	# Prometheus endpoint — caddy_http_requests_total, duration/size
+	# histograms. log_skip keeps scrape traffic out of the access log.
+	handle /metrics {
+		log_skip
+		metrics
+	}
+
+	handle /healthz {
+		log_skip
+		respond "ok" 200
+	}
+
+	handle {
+		file_server {
+			index index.html
+		}
+	}
+}

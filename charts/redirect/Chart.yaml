@@ -1,0 +1,6 @@
+apiVersion: v2
+name: redirect
+description: Caddy splash page that redirects migrated workloads to their new home
+type: application
+version: 0.1.0
+appVersion: '0.1.0'

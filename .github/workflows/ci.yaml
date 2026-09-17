@@ -1,0 +1,110 @@
+name: '[CI] Test, build & publish'
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: azure/setup-helm@v5
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | sudo tar xz -C /usr/local/bin kubeconform
+
+      - name: Lint all charts
+        run: |
+          for chart in charts/*/; do
+            helm lint "$chart"
+          done
+
+      - name: Validate rendered charts with kubeconform
+        run: |
+          for chart in charts/*/; do
+            helm template test "$chart" \
+              | kubeconform -strict -summary \
+                  -schema-location default \
+                  -ignore-missing-schemas
+          done
+
+      - name: Smoke-test Caddyfile adaptation
+        run: |
+          docker run --rm -e CONFIG_JSON='{"delaySeconds":5,"mappings":{}}' \
+            -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+
+  build-redirect:
+    uses: bcit-tlu/.github/.github/workflows/oci-build.yaml@main
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
+      actions: read
+    with:
+      component: redirect
+      image_name: redirect-service
+      context: .
+      target: stable
+    secrets: inherit
+
+  helm-publish:
+    needs: [helm-lint, build-redirect]
+    if: >-
+      always() && github.event_name != 'pull_request' &&
+      needs.helm-lint.result == 'success' &&
+      needs.build-redirect.result == 'success' &&
+      needs.build-redirect.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      REGISTRY: ghcr.io
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: azure/setup-helm@v5
+
+      - name: Helm login (OCI)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY: ${{ env.REGISTRY }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          echo "${GITHUB_TOKEN}" | \
+            helm registry login "${REGISTRY}" \
+            -u "${ACTOR}" \
+            --password-stdin
+
+      - name: Package and push chart
+        shell: bash
+        env:
+          VERSION: ${{ needs.build-redirect.outputs.rc_version }}
+          OCI_BASE: oci://${{ env.REGISTRY }}/${{ github.repository }}/charts
+        run: |
+          set -euo pipefail
+          CHART_DIR="charts/redirect"
+          CHART_NAME=$(yq '.name' "${CHART_DIR}/Chart.yaml")
+          mkdir -p /tmp/charts
+
+          helm package "${CHART_DIR}" \
+            --version "${VERSION}" \
+            --app-version "${VERSION}" \
+            -d /tmp/charts
+
+          helm push "/tmp/charts/${CHART_NAME}-${VERSION}.tgz" "${OCI_BASE}"

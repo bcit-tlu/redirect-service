@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Site migration in progress</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        background: #f4f6f8;
+        color: #1a2733;
+      }
+      .card {
+        max-width: 32rem;
+        margin: 1rem;
+        padding: 2.5rem 2rem;
+        background: #fff;
+        border-radius: 0.75rem;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 1rem;
+      }
+      p {
+        line-height: 1.5;
+        margin: 0.5rem 0;
+      }
+      .target {
+        font-weight: 600;
+        word-break: break-all;
+      }
+      #countdown {
+        display: inline-block;
+        margin-top: 1.25rem;
+        font-size: 2.5rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .continue {
+        display: inline-block;
+        margin-top: 1rem;
+        color: #0b5fa5;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #14181d;
+          color: #e6ebf0;
+        }
+        .card {
+          background: #1e242b;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+        }
+        .continue {
+          color: #6db3f2;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>This site is being migrated</h1>
+
+      <section id="redirecting" hidden>
+        <p>
+          We are moving this service to a new home. You will be redirected to
+          <span class="target" id="target"></span> momentarily.
+        </p>
+        <div id="countdown" aria-live="polite"></div>
+        <p><a class="continue" id="continue-now" href="#">Continue now</a></p>
+      </section>
+
+      <section id="no-mapping" hidden>
+        <p>
+          This service is undergoing maintenance, but no redirect is configured
+          for it. Please try again later or contact support if the problem
+          persists.
+        </p>
+      </section>
+
+      <noscript>
+        <p>
+          JavaScript is required for the automatic redirect. Please enable it
+          and reload this page.
+        </p>
+      </noscript>
+    </main>
+
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        // HAProxy passes the original host as ?from=; fall back to the
+        // current hostname so the page also works when the proxy forwards
+        // with the Host header preserved instead of issuing a 302.
+        var from = (params.get("from") || location.hostname)
+          .split(":")[0]
+          .toLowerCase();
+
+        fetch("/config.json", { cache: "no-store" })
+          .then(function (resp) {
+            if (!resp.ok) throw new Error("config fetch failed: " + resp.status);
+            return resp.json();
+          })
+          .then(function (cfg) {
+            var target = cfg.mappings && cfg.mappings[from];
+            if (!target) {
+              document.getElementById("no-mapping").hidden = false;
+              return;
+            }
+
+            var beaconUrl =
+              "/e/redirect?from=" +
+              encodeURIComponent(from) +
+              "&to=" +
+              encodeURIComponent(target);
+            var leave = function () {
+              // Beacon records the follow-through before navigation.
+              if (navigator.sendBeacon) navigator.sendBeacon(beaconUrl);
+              location.replace(target);
+            };
+
+            document.getElementById("target").textContent = target;
+            var link = document.getElementById("continue-now");
+            link.href = target;
+            link.addEventListener("click", function (e) {
+              e.preventDefault();
+              leave();
+            });
+            document.getElementById("redirecting").hidden = false;
+
+            var remaining = Math.max(0, cfg.delaySeconds || 5);
+            var el = document.getElementById("countdown");
+            el.textContent = remaining;
+            var timer = setInterval(function () {
+              remaining -= 1;
+              el.textContent = remaining;
+              if (remaining <= 0) {
+                clearInterval(timer);
+                leave();
+              }
+            }, 1000);
+          })
+          .catch(function () {
+            document.getElementById("no-mapping").hidden = false;
+          });
+      })();
+    </script>
+  </body>
+</html>
