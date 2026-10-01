@@ -7,3 +7,6 @@ Thumbs.db
 charts/*/charts/
 charts/*/Chart.lock
 *.tgz
+
+# Local git worktrees (convention: <repo>/.worktrees/<name>)
+.worktrees/
