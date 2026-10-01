@@ -1,6 +1,8 @@
 # VCS
 .git*
 .github
+# Local git worktrees (see .gitignore)
+.worktrees/
 
 # Everything not needed by the image
 charts/
