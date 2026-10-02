@@ -14,6 +14,16 @@ replicaCount: 2
 #   oldapp.example.com: https://newapp.example.com
 mappings: {}
 
+# Fallback target for hosts with no mapping: the splash shows a generic
+# "address not in service" page and auto-redirects here instead of the
+# neutral notice. Rendered as the `default_url` directive in the
+# chart's mappings.env — a deployer override ConfigMap takes precedence.
+defaultUrl: ''
+
+# Countdown (seconds) for the defaultUrl fallback. null falls back to
+# delaySeconds. Rendered as the `default_delay_seconds` directive.
+defaultDelaySeconds: null
+
 # Name of the deployer-provided ConfigMap whose mappings.env key
 # overrides the chart's default table (e.g. Flux configMapGenerator).
 # Referenced by an optional volume — absence is not an error.
@@ -44,6 +54,13 @@ metrics:
 
 networkPolicy:
   enabled: false
+  # Namespaces allowed to reach the http port (e.g. the ingress
+  # controller and the namespace Prometheus scrapes from). Empty = any
+  # source may reach :8080. Caution: a hostPort/hostNetwork ingress
+  # controller's traffic arrives with node source IPs and does NOT
+  # match namespace selectors — verify the source on-cluster before
+  # listing the controller's namespace here.
+  allowedNamespaces: []
 
 # Strong restricted-pod defaults. The Caddy container needs no privilege
 # and no Kubernetes API access.

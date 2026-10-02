@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light dark;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  background: #f4f6f8;
+  color: #1a2733;
+}
+.card {
+  max-width: 32rem;
+  margin: 1rem;
+  padding: 2.5rem 2rem;
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+h1 {
+  font-size: 1.35rem;
+  margin: 0 0 1rem;
+}
+p {
+  line-height: 1.5;
+  margin: 0.5rem 0;
+}
+.target {
+  font-weight: 600;
+  word-break: break-all;
+}
+.countdown {
+  display: inline-block;
+  margin-top: 1.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.continue {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #0b5fa5;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #14181d;
+    color: #e6ebf0;
+  }
+  .card {
+    background: #1e242b;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  }
+  .continue {
+    color: #6db3f2;
+  }
+}

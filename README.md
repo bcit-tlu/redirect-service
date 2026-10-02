@@ -24,19 +24,33 @@ browser ──► https://oldapp.example.com
    is sent to the mapped target. Redirects go to the target **root** —
    the original path/query is intentionally dropped.
 
-If the `from` host is missing or not in the table, the page shows a neutral
-"no redirect configured" notice and never redirects. There is no `?to=`
-parameter, so the service cannot be abused as an open redirect.
+When the proxy preserves the request `Host` instead of issuing a 302 —
+e.g. a wildcard catch-all Ingress forwarding unknown hosts — the splash
+uses `location.hostname` as the `from` key and the page is served on the
+original hostname.
+
+If the `from` host is not in the table but a `default_url` is configured,
+the page shows a generic "address not in service" notice and redirects to
+that URL after `default_delay_seconds` — this is the catch-all path for a
+wildcard-ingress deployment (see [`docs/haproxy.md`](docs/haproxy.md)). With
+no `default_url`, unmapped hosts keep the neutral "no redirect configured"
+notice and never redirect. There is no `?to=` parameter, so the service
+cannot be abused as an open redirect; `?from` and the request hostname are
+lookup keys only and are never rendered into the page.
 
 ## Configuration
 
 The mapping table is a `KEY=VALUE` env file — one `host=target` per
 line, `#` comments and blank lines ignored, split on the first `=` so
-targets keep query strings intact. `delay_seconds` is a reserved
-directive key (countdown length), not a host mapping:
+targets keep query strings intact. Three reserved directive keys are
+not host mappings — `delay_seconds` (migration countdown),
+`default_url` (fallback target for unmapped hosts), and
+`default_delay_seconds` (its countdown; falls back to `delay_seconds`):
 
 ```
 delay_seconds=5
+default_url=https://www.example.com/
+default_delay_seconds=3
 oldapp.example.com=https://newapp.example.com
 ```
 
@@ -47,7 +61,8 @@ The entrypoint picks **one** file, first match wins:
    ConfigMap (e.g. Flux `configMapGenerator`), mounted by the chart
    from the ConfigMap named by `mappingsConfigMap`
 3. `/etc/redirect-service/chart/mappings.env` — the chart's own
-   ConfigMap, rendered from the `mappings` + `delaySeconds` values
+   ConfigMap, rendered from the `mappings`, `delaySeconds`,
+   `defaultUrl`, and `defaultDelaySeconds` values
 4. `/etc/redirect-service/mappings.env` — baked into the image
    (empty by default)
 
@@ -88,7 +103,7 @@ belong in Git.
 | Path           | Purpose                                          |
 | -------------- | ------------------------------------------------ |
 | `/`            | Splash page (expects `?from=<host>`).            |
-| `/config.json` | `{"delaySeconds":N,"mappings":{...}}`            |
+| `/config.json` | `{"delaySeconds":N,"defaultUrl":"…"|null,"defaultDelaySeconds":N,"mappings":{…}}` |
 | `/e/redirect`  | 204 beacon recorded before browser navigation.   |
 | `/metrics`     | Prometheus metrics.                              |
 | `/healthz`     | Liveness/readiness.                              |

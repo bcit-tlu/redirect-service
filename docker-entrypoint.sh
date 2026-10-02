@@ -28,12 +28,14 @@ mappings_file() {
 	done
 }
 
-# One directive + mappings per file: 'delay_seconds=N' sets the
-# countdown (default: $REDIRECT_DELAY_SECONDS env, then 5); every other
-# line is host=target. '#' comments and blank lines ignored; split on
-# the first '=' so target URLs keep query strings intact. Mapping keys
-# are normalized to lowercase. Atomic write (tmp + mv) so file_server
-# never serves a partial body.
+# Directives + mappings per file: 'delay_seconds=N' sets the migration
+# countdown (default: $REDIRECT_DELAY_SECONDS env, then 5);
+# 'default_url=URL' is the fallback target for hosts with no mapping and
+# 'default_delay_seconds=N' its countdown (default: delay_seconds, then
+# the same env/5 chain); every other line is host=target. '#' comments
+# and blank lines ignored; split on the first '=' so target URLs keep
+# query strings intact. Mapping keys are normalized to lowercase.
+# Atomic write (tmp + mv) so file_server never serves a partial body.
 render() {
 	f=$(mappings_file)
 	[ -n "$f" ] || {
@@ -45,13 +47,19 @@ render() {
 		--arg delayenv "${REDIRECT_DELAY_SECONDS:-5}" \
 		'def toint: tonumber? // null;
 		 reduce (inputs | select(test("\\S")) | select(startswith("#") | not)) as $l
-			({mappings: {}, delay: null};
+			({mappings: {}, delay: null, default_url: null, default_delay: null};
 			 ($l | split("=")) as $kv
-			 | if ($kv[0] | ascii_downcase) == "delay_seconds"
-				then .delay = (($kv[1:] | join("=")) | toint)
-				else .mappings += {($kv[0]): ($kv[1:] | join("="))}
+			 | ($kv[0] | ascii_downcase) as $key
+			 | ($kv[1:] | join("=")) as $val
+			 | if $key == "delay_seconds" then .delay = ($val | toint)
+				elif $key == "default_url" then .default_url = $val
+				elif $key == "default_delay_seconds" then .default_delay = ($val | toint)
+				else .mappings += {($kv[0]): $val}
 				end)
-		 | {delaySeconds: (.delay // ($delayenv | toint) // 5),
+		 | .delay as $d
+		 | {delaySeconds: ($d // ($delayenv | toint) // 5),
+			defaultUrl: .default_url,
+			defaultDelaySeconds: (.default_delay // $d // ($delayenv | toint) // 5),
 			mappings: (.mappings | with_entries(.key |= ascii_downcase))}' \
 		"$f" > "$tmp" || return 1
 	mv "$tmp" "$CONFIG_OUT"
