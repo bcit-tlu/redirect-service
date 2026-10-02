@@ -66,6 +66,42 @@ proxy config and let the normal `use_backend` rules resume. The
 redirect service and `redirect.example.com` can stay up indefinitely — a
 host with no ACL redirect never reaches it.
 
+## Catch-all for unknown hosts (wildcard ingress)
+
+An alternative topology for "any unmatched `*.example.com` host should
+get the splash": instead of an edge 302, let unmatched hosts fall
+through to the cluster ingress controller (e.g. HAProxy's
+`default_backend`) and give the redirect Ingress a wildcard host:
+
+```yaml
+ingress:
+  hosts:
+    - host: redirect.example.com   # exact splash host
+      paths: [{ path: /, pathType: Prefix }]
+    - host: "*.example.com"        # catch-all — exact matches always win
+      paths: [{ path: /, pathType: Prefix }]
+  tls:
+    - hosts: [redirect.example.com, "*.example.com"]
+      secretName: <wildcard-cert-secret>
+```
+
+The page resolves `from` from `location.hostname` when `?from` is
+absent, so `anything.example.com` serves the splash on its own hostname.
+Unmapped hosts redirect to the configured `default_url` after
+`default_delay_seconds` (without `default_url` they get the neutral
+notice). Notes:
+
+- Ingress wildcard hosts match a single DNS label only
+  (`a.b.example.com` is not covered) — typically the same limit as the
+  wildcard TLS cert anyway.
+- One wildcard owner per ingress controller: if another Ingress claims
+  `*.example.com`, the controller picks one.
+- Keep the redirect service pod-scoped tight when it answers on
+  arbitrary hostnames: the chart's `networkPolicy` + the Caddyfile's
+  CSP/`no-store` headers are the guardrails; a hostPort/hostNetwork
+  ingress controller's traffic arrives with node source IPs, so verify
+  before restricting `allowedNamespaces`.
+
 ## Sanity checks after wiring
 
 ```bash

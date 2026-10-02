@@ -30,6 +30,9 @@
 		-Server
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
+		# The splash answers on arbitrary wildcard hosts — no inline
+		# script/style, no external assets, so 'self' is sufficient.
+		Content-Security-Policy "default-src 'self'"
 		# Splash page and map must never be cached during a migration —
 		# a cached config would keep redirecting after the map changes.
 		Cache-Control no-store

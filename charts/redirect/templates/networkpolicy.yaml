@@ -13,12 +13,21 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # HAProxy fronts this service and Prometheus scrapes /metrics; both
-    # arrive on the http port. Restrict further by selector in overlays
-    # once the caller namespaces are known.
+    # HAProxy fronts this service (through the cluster ingress) and
+    # Prometheus scrapes /metrics; both arrive on the http port.
+    # allowedNamespaces adds namespaceSelector peers — empty means any
+    # source may reach :8080. See values.yaml for the hostPort caveat.
     - ports:
         - port: 8080
           protocol: TCP
+      {{- with .Values.networkPolicy.allowedNamespaces }}
+      from:
+        {{- range . }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
   egress:
     # DNS only — the service makes no outbound connections.
     - ports:
