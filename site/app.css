@@ -37,6 +37,10 @@ p {
   font-weight: 600;
   word-break: break-all;
 }
+.hint {
+  font-size: 0.875rem;
+  opacity: 0.75;
+}
 .countdown {
   display: inline-block;
   margin-top: 1.25rem;

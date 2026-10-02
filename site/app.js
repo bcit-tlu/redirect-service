@@ -68,7 +68,7 @@
         return;
       }
       if (cfg.defaultUrl) {
-        document.title = "Address not in service";
+        document.title = "No site at this address";
         startRedirect(
           document.getElementById("default-redirect"),
           cfg.defaultUrl,
