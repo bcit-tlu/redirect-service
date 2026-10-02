@@ -30,7 +30,7 @@ uses `location.hostname` as the `from` key and the page is served on the
 original hostname.
 
 If the `from` host is not in the table but a `default_url` is configured,
-the page shows a generic "address not in service" notice and redirects to
+the page shows a generic "No site at this address" notice and redirects to
 that URL after `default_delay_seconds` — this is the catch-all path for a
 wildcard-ingress deployment (see [`docs/haproxy.md`](docs/haproxy.md)). With
 no `default_url`, unmapped hosts keep the neutral "no redirect configured"

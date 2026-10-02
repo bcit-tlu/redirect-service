@@ -15,7 +15,7 @@ replicaCount: 2
 mappings: {}
 
 # Fallback target for hosts with no mapping: the splash shows a generic
-# "address not in service" page and auto-redirects here instead of the
+# "No site at this address" page and auto-redirects here instead of the
 # neutral notice. Rendered as the `default_url` directive in the
 # chart's mappings.env — a deployer override ConfigMap takes precedence.
 defaultUrl: ''
