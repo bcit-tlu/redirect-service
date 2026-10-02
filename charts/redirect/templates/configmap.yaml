@@ -15,8 +15,8 @@ data:
     {{- with .Values.defaultUrl }}
     default_url={{ . }}
     {{- end }}
-    {{- with .Values.defaultDelaySeconds }}
-    default_delay_seconds={{ . }}
+    {{- if not (kindIs "invalid" .Values.defaultDelaySeconds) }}
+    default_delay_seconds={{ .Values.defaultDelaySeconds }}
     {{- end }}
     {{- range $host, $target := .Values.mappings }}
     {{ $host }}={{ $target }}

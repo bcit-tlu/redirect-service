@@ -34,6 +34,11 @@
     section.hidden = false;
 
     var remaining = Math.max(0, delaySeconds);
+    if (remaining <= 0) {
+      // A configured zero (or negative) delay redirects immediately.
+      leave();
+      return;
+    }
     var el = section.querySelector(".countdown");
     el.textContent = remaining;
     var timer = setInterval(function () {
