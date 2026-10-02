@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/bcit-tlu/redirect-service/compare/v0.4.0...v0.5.0) (2026-10-02)
+
+
+### Features
+
+* default_url catch-all for unmapped hosts ([8c518b0](https://github.com/bcit-tlu/redirect-service/commit/8c518b01cf4040081c69eda700419574e06d3d01))
+* default_url catch-all for unmapped hosts ([681b287](https://github.com/bcit-tlu/redirect-service/commit/681b287ec43b0e328773fd09d265f5b2ec1ed383))
+
+
+### Bug Fixes
+
+* honor zero default_delay_seconds end to end ([0e15a97](https://github.com/bcit-tlu/redirect-service/commit/0e15a977423e705efb59a34122eb1d4016ffdda7))
+
 ## [0.4.0](https://github.com/bcit-tlu/redirect-service/compare/v0.3.1...v0.4.0) (2026-09-17)
 
 
